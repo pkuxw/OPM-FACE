@@ -3,7 +3,7 @@
 #          Bingjiang Lyu <bingjiang.lyu@gmail.com>
 # License: Simplified BSD
 
-__all__ = ["Cluster_Perm_Test", "find_latency"]
+__all__ = ['Cluster_Perm_Test', 'find_latency']
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -213,7 +213,7 @@ def find_latency(
     result: np.ndarray,
     ps_mask: np.ndarray,
     custom_onset: int = 200,
-    max_scheme: str | int = "in_mask",
+    max_scheme: str | int = 'in_mask',
 ) -> tuple:
     # TODO: Docstring
     ps = ps_mask.copy()
@@ -227,7 +227,7 @@ def find_latency(
         res = result.mean(axis=0).copy()
 
         res[:onset] = np.nan
-        if max_scheme == "in_mask":
+        if max_scheme == 'in_mask':
             res[offset:] = np.nan
         elif isinstance(max_scheme, int):
             res[max_scheme:] = np.nan

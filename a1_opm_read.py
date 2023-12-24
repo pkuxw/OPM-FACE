@@ -21,47 +21,29 @@ from box import Box
 from rawutil import unpack
 from scipy.io import savemat
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings('ignore')
 
-ROOT = Path("../data/")
+ROOT = Path('../data/')
 
-SUBJ = [
-    "S01",
-    "S02",
-    "S03",
-    "S04",
-    "S06",
-    "S07",
-    "S08",
-    "S09",
-    "S10",
-    "S11",
-    "S13",
-    "S14",
-    "S15",
-    "S16",
-    "S17",
-    "S18",
-    "S19",
-    "S20",
-    "S21",
-    "S22",
-    "S23",
-]
+# fmt: off
+SUBJ = ['S01', 'S02', 'S03', 'S04', 'S06', 'S07', 'S08',
+        'S09', 'S10', 'S11', 'S13', 'S14', 'S15', 'S16',
+        'S17', 'S18', 'S19', 'S20', 'S21', 'S22', 'S23']
+# fmt: on
 
 
 def OPM_drg(file_path: Path) -> Box:
-    with open(file_path, "rb") as f:
+    with open(file_path, 'rb') as f:
         data = Box()
-        num_pkgs = unpack(">I", f.read(4))[0]
-        if "data" in file_path.name:
+        num_pkgs = unpack('>I', f.read(4))[0]
+        if 'data' in file_path.name:
             data.pulse_cnt = np.zeros(num_pkgs * 10)
             data.field = np.zeros(num_pkgs * 10)
             data.is_missing = False
             for i in range(num_pkgs):
-                pulse_cnt = unpack(">I", f.read(4))[0]
-                _ = unpack(">29b", f.read(29))
-                field_array = unpack(">10f", f.read(40))
+                pulse_cnt = unpack('>I', f.read(4))[0]
+                _ = unpack('>29b', f.read(29))
+                field_array = unpack('>10f', f.read(40))
                 field_array = np.array(field_array) * 1e6
                 data.pulse_cnt[i * 10 : (i + 1) * 10] = np.arange(0, 20, 2) + pulse_cnt
                 data.field[i * 10 : (i + 1) * 10] = field_array
@@ -70,12 +52,12 @@ def OPM_drg(file_path: Path) -> Box:
                 if i == num_pkgs - 1:
                     tmp = np.floor((pulse_cnt - min_cnt) / 20) + 1  # type: ignore
                     data.is_missing = tmp != num_pkgs
-        elif "Trigger" in file_path.name:
+        elif 'Trigger' in file_path.name:
             data.pulse_cnt = np.zeros(num_pkgs)
             data.trigger = np.zeros(num_pkgs)
             for i in range(num_pkgs):
-                pulse_cnt = unpack(">I", f.read(4))[0]
-                trigger = unpack(">B", f.read(1))[0]
+                pulse_cnt = unpack('>I', f.read(4))[0]
+                trigger = unpack('>B', f.read(1))[0]
                 data.pulse_cnt[i] = pulse_cnt
                 data.trigger[i] = trigger
 
@@ -87,7 +69,7 @@ def OPM_chn(folder_name: Path, sess: int) -> Tuple[np.ndarray, int]:
     min_cnt = np.zeros(len(channels))
     max_cnt = np.zeros(len(channels))
 
-    file_list = [folder_name / f"data{chn}_{sess}.drg" for chn in channels]
+    file_list = [folder_name / f'data{chn}_{sess}.drg' for chn in channels]
     data_all = jl.Parallel(n_jobs=8)(jl.delayed(OPM_drg)(_f) for _f in file_list)
 
     for i, data in enumerate(data_all):
@@ -115,7 +97,7 @@ def OPM_chn(folder_name: Path, sess: int) -> Tuple[np.ndarray, int]:
     for i, data in enumerate(data_all):
         if not bad_channel[i]:
             if data.is_missing:  # type: ignore
-                warnings.warn(f"Channel {channels[i]} has data missing!!!", UserWarning)
+                warnings.warn(f'Channel {channels[i]} has data missing!!!', UserWarning)
                 field_tmp = 0
                 cnt = 0
                 for pulse_cnt, field in zip(data.pulse_cnt, data.field):  # type: ignore
@@ -138,7 +120,7 @@ def OPM_chn(folder_name: Path, sess: int) -> Tuple[np.ndarray, int]:
 
 
 def OPM_evt(folder_name: Path, sess: int, min_cnt: int) -> Box:
-    data = OPM_drg(folder_name / f"Trigger_{sess}.drg")
+    data = OPM_drg(folder_name / f'Trigger_{sess}.drg')
     data.pulse_cnt = data.pulse_cnt // 2 - min_cnt
     i = np.where(data.trigger > 0)[0]
     data.trigger = data.trigger[i].astype(int)
@@ -148,33 +130,33 @@ def OPM_evt(folder_name: Path, sess: int, min_cnt: int) -> Box:
 
 
 def OPM_proc(ROOT: Path, subj: str, sess: str) -> None:
-    raw_path = ROOT / "drg" / subj / sess
+    raw_path = ROOT / 'drg' / subj / sess
     channels = list(range(1, 1 + 64))
-    n_sess = int(len(list(raw_path.glob("data*"))) / len(channels))
+    n_sess = int(len(list(raw_path.glob('data*'))) / len(channels))
 
     for ii in range(1, n_sess + 1):
-        fname_out = ROOT / "raw" / subj / sess / f"run{ii}.mat"
+        fname_out = ROOT / 'raw' / subj / sess / f'run{ii}.mat'
 
         if fname_out.exists():
             continue
 
         raw, min_cnt = OPM_chn(raw_path, ii)
         raw = np.append(raw, np.zeros((raw.shape[0], 1)), axis=1)
-        fname_trigger = raw_path / f"Trigger_{ii}.drg"
+        fname_trigger = raw_path / f'Trigger_{ii}.drg'
 
         if fname_trigger.exists():
             tri = OPM_evt(raw_path, ii, min_cnt)
-            if "resting" in str(raw_path) or "emptyroom" in str(raw_path):
+            if 'resting' in str(raw_path) or 'emptyroom' in str(raw_path):
                 raw[5999, -1] = 1
             else:
                 raw[tri.pulse_cnt - 1, -1] = tri.trigger
 
-        savemat(fname_out, {"raw": raw, "channels": channels}, do_compression=True)
+        savemat(fname_out, {'raw': raw, 'channels': channels}, do_compression=True)
 
-    print(f"{subj} {sess} is done...")
+    print(f'{subj} {sess} is done...')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     for subj in SUBJ:
-        for proc in ["A", "B", "emptyroom", "resting-1", "resting-2"]:
+        for proc in ['A', 'B', 'emptyroom', 'resting-1', 'resting-2']:
             OPM_proc(ROOT, subj, proc)
